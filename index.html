@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MontPro · Threads Carousel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Inter:wght@900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  font-family:'Geist','Plus Jakarta Sans',sans-serif;
+  background:#060c18;
+  min-height:100vh;
+  padding:44px 40px 80px;
+  color:#fff;
+}
+
+/* ── Shell ── */
+.app-shell{
+  display:flex;
+  flex-direction:row;
+  gap:48px;
+  align-items:flex-start;
+  justify-content:center;
+}
+
+/* ── Left Panel ── */
+.left-panel{
+  width:320px;
+  flex-shrink:0;
+  position:sticky;
+  top:44px;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+.app-label{
+  font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:rgba(255,255,255,.25);font-weight:500;
+}
+.left-card{
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:24px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.input-label{
+  font-size:11px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.35);
+}
+#topicInput{
+  width:100%;min-height:180px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  color:#fff;
+  font-family:inherit;font-size:14px;line-height:1.6;
+  padding:14px 16px;
+  resize:vertical;
+  transition:border-color .18s;
+}
+#topicInput:focus{outline:none;border-color:rgba(0,212,170,.4);}
+#topicInput::placeholder{color:rgba(255,255,255,.2);}
+#genBtn{
+  background:#00d4aa;color:#0f172a;border:none;
+  padding:13px 20px;border-radius:8px;
+  font-family:inherit;font-size:14px;font-weight:700;
+  cursor:pointer;letter-spacing:.01em;
+  transition:opacity .18s;width:100%;
+}
+#genBtn:hover:not([disabled]){opacity:.85;}
+#genBtn[disabled]{opacity:.5;cursor:default;}
+.gen-status{font-size:12px;color:#00d4aa;min-height:18px;font-weight:500;}
+
+/* ── Caption card ── */
+.caption-card{display:none;}
+.cap-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.cap-count{font-size:11px;font-weight:600;color:rgba(255,255,255,.3);letter-spacing:.04em;}
+.cap-count.over{color:rgba(239,68,68,.9);}
+.caption-output{
+  font-size:13px;line-height:1.75;word-break:break-word;
+  max-height:320px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent;
+}
+.caption-output::-webkit-scrollbar{width:4px;}
+.caption-output::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+.caption-output p{color:rgba(255,255,255,.72);margin-bottom:12px;}
+.caption-output p:last-child{margin-bottom:0;}
+.caption-output .c-tags{color:rgba(0,212,170,.6);font-size:12px;letter-spacing:.01em;}
+
+/* ── Placeholder ── */
+.placeholder-slide{align-items:center;justify-content:center;text-align:center;}
+.ph-wrap{display:flex;flex-direction:column;align-items:center;gap:18px;position:relative;z-index:2;}
+.ph-icon{
+  width:60px;height:60px;border-radius:16px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;color:rgba(0,212,170,.45);
+}
+.ph-title{font-size:18px;font-weight:700;color:rgba(255,255,255,.22);letter-spacing:-.01em;}
+.ph-hint{font-size:13px;color:rgba(255,255,255,.14);line-height:1.7;}
+.btn-copy{
+  background:transparent;color:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.14);
+  padding:10px 16px;border-radius:8px;
+  font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .18s;align-self:flex-start;
+}
+.btn-copy:hover{background:rgba(255,255,255,.07);color:#fff;}
+.btn-copy.copied{color:#00d4aa;border-color:rgba(0,212,170,.3);}
+
+/* ── Right Panel ── */
+.right-panel{
+  display:flex;flex-direction:column;
+  align-items:center;gap:16px;
+}
+
+/* ── Viewer 4:5 ── */
+.viewer{position:relative;width:540px;height:675px;}
+.slide{
+  /* Deck accent — set per-deck via JS; bluish-aligned default (teal). */
+  --accent:#00d4aa;
+  --accent-rgb:0,212,170;
+  position:absolute;inset:0;
+  width:540px;height:675px;
+  background:linear-gradient(148deg,#193a6d 0%,#0f172a 100%);
+  overflow:hidden;
+  padding:30px 32px 30px;
+  display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+}
+.slide.active{opacity:1;pointer-events:auto;}
+
+/* ── Shared header (counter) ── */
+.sh{
+  display:flex;justify-content:flex-start;align-items:center;
+  margin-bottom:24px;position:relative;z-index:3;
+}
+.snum{
+  font-size:11px;font-weight:500;
+  color:rgba(255,255,255,.25);letter-spacing:.14em;
+}
+
+/* ══ SLIDE: HOOK ══ */
+.s1-grid{
+  position:absolute;inset:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,.08) 1px,transparent 1px);
+  background-size:26px 26px;
+  pointer-events:none;z-index:0;
+}
+.s1-deco{position:absolute;top:-20px;right:-20px;opacity:.12;pointer-events:none;z-index:1;}
+.s1-body{
+  flex:1;display:flex;flex-direction:column;
+  justify-content:center;position:relative;z-index:2;
+  margin-left:40px;
+  margin-right:40px;
+}
+.s1-pre{
+  font-size:18px;font-weight:400;
+  color:rgba(255,255,255,.5);
+  margin-bottom:16px;line-height:1.5;letter-spacing:.01em;
+}
+.s1-hl{
+  font-size:42px;font-weight:800;
+  line-height:1.1;color:#fff;letter-spacing:-.02em;
+}
+.s1-hl em{font-style:normal;color:var(--accent);}
+.s1-rule{width:44px;height:3px;background:var(--accent);border-radius:2px;margin-top:28px;}
+.s1-sub{
+  margin-top:14px;font-size:12px;font-weight:500;
+  color:rgba(255,255,255,.25);letter-spacing:.1em;text-transform:uppercase;
+}
+
+/* ══ SLIDE: COMPARE ══ */
+.s2-compare{
+  display:flex;gap:0;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;overflow:hidden;
+  margin-bottom:20px;height:260px;
+  margin-top:100px;
+}
+.s2-panel{
+  flex:1;padding:20px 18px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.s2-panel:first-child{border-right:1px solid rgba(255,255,255,.08);}
+.s2-lbl{font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.32);}
+.s2-num{font-size:22px;font-weight:800;margin:8px 0 4px;letter-spacing:-.01em;}
+.s2-num.grey{color:rgba(255,255,255,.42);}
+.s2-num.teal{color:var(--accent);}
+.s2-badge{
+  margin-top:auto;font-size:9px;font-weight:700;
+  padding:3px 8px;border-radius:4px;letter-spacing:.06em;
+  text-transform:uppercase;display:inline-block;
+}
+.s2-badge.static{background:rgba(255,255,255,.07);color:rgba(255,255,255,.32);}
+.s2-badge.live{background:rgba(var(--accent-rgb),.13);color:var(--accent);}
+.s2-badge.danger{background:rgba(239,68,68,.12);color:rgba(239,68,68,.9);}
+.s2-badge.warn{background:rgba(251,191,36,.12);color:rgba(251,191,36,.9);}
+.s2-copy{font-size:14px;font-weight:400;color:rgba(255,255,255,.72);line-height:1.7;}
+
+/* ══ SLIDE: CHART ══ */
+.s3-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+  margin-top:120px;
+}
+.s3-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:-.01em;}
+.s3-sync{
+  display:flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:600;color:var(--accent);
+  background:rgba(var(--accent-rgb),.1);
+  padding:4px 9px;border-radius:20px;
+}
+.s3-dot{width:5px;height:5px;background:var(--accent);border-radius:50%;}
+.s3-widget{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:16px 14px 14px;
+  margin-bottom:18px;flex:0 0 auto;
+  display:flex;flex-direction:column;
+}
+.s3-bars{
+  display:flex;align-items:flex-end;gap:3px;
+  height:80px;
+  margin-bottom:10px;
+}
+.s3-col{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-end;gap:4px;height:100%;
+}
+.s3-bar{width:100%;border-radius:2px 2px 0 0;min-height:3px;}
+.s3-bar.pos{background:rgba(var(--accent-rgb),.72);}
+.s3-bar.neg{background:rgba(239,68,68,.55);}
+.s3-wk{font-size:8px;color:rgba(255,255,255,.28);}
+.s3-summary{
+  display:flex;gap:10px;padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.07);margin-top:auto;
+}
+.s3-stat{flex:1;}
+.s3-stat-lbl{font-size:9px;color:rgba(255,255,255,.28);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+.s3-stat-val{font-size:14px;font-weight:800;letter-spacing:-.01em;}
+.s3-copy{font-size:14px;font-weight:400;color:rgba(255,255,255,.72);line-height:1.7;}
+
+/* ══ SLIDE: WHATIF ══ */
+.s4-intro{
+  font-size:12px;font-weight:500;color:rgba(255,255,255,.35);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;
+  margin-top:100px;
+}
+.s4-cards{display:flex;gap:12px;margin-bottom:20px;flex:0 0 auto;}
+.s4-card{
+  flex:1;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:12px;padding:18px 16px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.s4-card.hi{border-color:rgba(var(--accent-rgb),.35);background:rgba(var(--accent-rgb),.05);}
+.s4-ico{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.s4-ico.red-bg{background:rgba(239,68,68,.12);}
+.s4-ico.teal-bg{background:rgba(var(--accent-rgb),.12);}
+.s4-qlbl{font-size:9px;font-weight:600;color:rgba(255,255,255,.32);text-transform:uppercase;letter-spacing:.1em;}
+.s4-q{font-size:14px;font-weight:600;color:#fff;line-height:1.4;letter-spacing:-.01em;}
+.s4-spacer{flex:1;}
+.s4-result{border-radius:8px;padding:10px 12px;}
+.s4-result.red{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.18);}
+.s4-result.tl{background:rgba(var(--accent-rgb),.07);border:1px solid rgba(var(--accent-rgb),.15);}
+.s4-rlbl{font-size:9px;font-weight:700;margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase;}
+.s4-rlbl.red{color:rgba(239,68,68,.8);}
+.s4-rlbl.tl{color:rgba(var(--accent-rgb),.72);}
+.s4-rval{font-size:14px;font-weight:800;letter-spacing:-.01em;}
+.s4-rval.red{color:rgba(239,68,68,.9);}
+.s4-rval.tl{color:var(--accent);}
+.s4-copy{font-size:14px;font-weight:400;color:rgba(255,255,255,.72);line-height:1.7;}
+
+/* ══ SLIDE: BODY ══ */
+.sbody-body{
+  flex:1;display:flex;flex-direction:column;
+  justify-content:center;position:relative;z-index:2;
+  padding:0 8px;
+}
+.sbody-hl{
+  font-size:34px;font-weight:800;
+  line-height:1.15;color:#fff;letter-spacing:-.02em;
+  margin-bottom:22px;
+}
+.sbody-hl em{font-style:normal;color:var(--accent);}
+.sbody-copy{font-size:16px;font-weight:400;color:rgba(255,255,255,.72);line-height:1.75;}
+
+/* ══ SLIDE: CTA ══ */
+.s5{align-items:center;justify-content:center;text-align:center;}
+.s5-rings{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  opacity:.05;pointer-events:none;z-index:0;
+}
+.s5-sh{
+  position:absolute;top:30px;left:32px;right:32px;
+  display:flex;justify-content:flex-start;align-items:center;
+  z-index:3;
+}
+.s5-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;}
+.s5-copy{
+  font-size:22px;font-weight:700;color:rgba(255,255,255,.88);
+  line-height:1.45;margin-bottom:32px;
+  max-width:320px;letter-spacing:-.02em;
+}
+.s5-copy em{font-style:normal;color:var(--accent);}
+.s5-cta{
+  background:var(--accent);color:#0f172a;
+  font-family:inherit;font-size:14px;font-weight:700;
+  padding:15px 32px;border-radius:8px;
+  letter-spacing:.01em;display:inline-block;
+  margin-bottom:14px;
+}
+.s5-note{font-size:12px;color:rgba(255,255,255,.28);font-weight:500;}
+.s5-rule{width:40px;height:2px;background:rgba(255,255,255,.12);border-radius:2px;margin:0 auto 32px;}
+
+/* ══ SLIDE: STAT (hero metric) ══ */
+.sstat-body{
+  flex:1;display:flex;flex-direction:column;
+  justify-content:center;position:relative;z-index:2;
+  padding:0 8px;
+}
+.sstat-intro{
+  font-size:12px;font-weight:600;color:rgba(255,255,255,.35);
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px;
+}
+.sstat-num{
+  font-size:88px;font-weight:800;line-height:.95;
+  color:var(--accent);letter-spacing:-.04em;
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+}
+.sstat-delta{
+  font-size:13px;font-weight:700;letter-spacing:.02em;
+  padding:5px 11px;border-radius:6px;white-space:nowrap;
+}
+.sstat-delta.up{background:rgba(var(--accent-rgb),.13);color:var(--accent);}
+.sstat-delta.down{background:rgba(239,68,68,.12);color:rgba(239,68,68,.9);}
+.sstat-delta.flat{background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);}
+.sstat-label{
+  font-size:18px;font-weight:600;color:#fff;
+  margin-top:18px;letter-spacing:-.01em;
+}
+.sstat-copy{font-size:14px;font-weight:400;color:rgba(255,255,255,.66);line-height:1.7;margin-top:16px;max-width:420px;}
+
+/* ══ SLIDE: LIST (numbered / checklist) ══ */
+.slist-title{
+  font-size:26px;font-weight:800;color:#fff;
+  letter-spacing:-.02em;line-height:1.2;
+  margin-top:40px;margin-bottom:22px;
+}
+.slist-title em{font-style:normal;color:var(--accent);}
+.slist-items{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
+.slist-row{
+  display:flex;gap:14px;align-items:flex-start;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;padding:15px 16px;
+}
+.slist-badge{
+  flex-shrink:0;width:30px;height:30px;border-radius:9px;
+  background:rgba(var(--accent-rgb),.13);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;
+}
+.slist-txt{display:flex;flex-direction:column;gap:3px;}
+.slist-lbl{font-size:15px;font-weight:700;color:#fff;letter-spacing:-.01em;line-height:1.3;}
+.slist-desc{font-size:13px;font-weight:400;color:rgba(255,255,255,.55);line-height:1.5;}
+.slist-copy{font-size:14px;font-weight:400;color:rgba(255,255,255,.66);line-height:1.7;margin-top:auto;}
+
+/* ══ SLIDE: QUOTE (bold statement) ══ */
+.squote-body{
+  flex:1;display:flex;flex-direction:column;
+  justify-content:center;position:relative;z-index:2;padding:0 6px;
+}
+.squote-mark{
+  font-family:'Inter',sans-serif;font-size:120px;line-height:.6;
+  font-weight:900;color:var(--accent);opacity:.18;margin-bottom:8px;
+}
+.squote-text{
+  font-size:30px;font-weight:700;color:#fff;
+  line-height:1.32;letter-spacing:-.02em;
+}
+.squote-text em{font-style:normal;color:var(--accent);}
+.squote-attr{
+  margin-top:24px;font-size:13px;font-weight:600;
+  color:rgba(255,255,255,.4);letter-spacing:.04em;
+}
+.squote-attr::before{content:"— ";}
+
+/* ══ SLIDE: INSIGHT (AI alerts — mirrors product) ══ */
+.sins-intro{
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:600;color:rgba(255,255,255,.35);
+  letter-spacing:.1em;text-transform:uppercase;
+  margin-top:36px;margin-bottom:16px;
+}
+.sins-spark{color:var(--accent);font-size:13px;}
+.sins-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+.sins-row{
+  display:flex;gap:12px;align-items:flex-start;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-left-width:3px;border-radius:10px;padding:13px 15px;
+}
+.sins-row.high{border-left-color:rgba(239,68,68,.85);}
+.sins-row.medium{border-left-color:rgba(251,191,36,.85);}
+.sins-row.low{border-left-color:rgba(255,255,255,.25);}
+.sins-dot{flex-shrink:0;width:8px;height:8px;border-radius:50%;margin-top:5px;}
+.sins-row.high .sins-dot{background:rgba(239,68,68,.9);}
+.sins-row.medium .sins-dot{background:rgba(251,191,36,.9);}
+.sins-row.low .sins-dot{background:rgba(255,255,255,.3);}
+.sins-main{flex:1;display:flex;flex-direction:column;gap:3px;}
+.sins-cat{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);}
+.sins-title{font-size:14px;font-weight:600;color:#fff;line-height:1.35;letter-spacing:-.01em;}
+.sins-val{flex-shrink:0;font-size:14px;font-weight:800;letter-spacing:-.01em;}
+.sins-row.high .sins-val{color:rgba(239,68,68,.9);}
+.sins-row.medium .sins-val{color:rgba(251,191,36,.9);}
+.sins-row.low .sins-val{color:var(--accent);}
+.sins-copy{font-size:14px;font-weight:400;color:rgba(255,255,255,.66);line-height:1.7;margin-top:auto;}
+
+/* ── Logo classes ── */
+.logo-br{
+  position:absolute;bottom:28px;right:32px;
+  font-size:14px;font-weight:900;letter-spacing:-.01em;
+  z-index:3;font-family:'Inter',sans-serif;
+}
+.logo-center{
+  font-size:28px;font-weight:900;
+  font-family:'Inter',sans-serif;
+  margin-top:24px;margin-bottom:20px;
+  position:relative;z-index:2;
+}
+
+/* ── Nav ── */
+.controls{display:flex;align-items:center;gap:14px;}
+.nav-arrow{
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.1);
+  color:#fff;font-size:17px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .18s;font-family:inherit;
+}
+.nav-arrow:hover:not([disabled]){background:rgba(255,255,255,.14);}
+.nav-arrow[disabled]{opacity:.2;cursor:default;}
+.dots{display:flex;gap:6px;}
+.dot{
+  width:6px;height:6px;border-radius:3px;
+  background:rgba(255,255,255,.2);cursor:pointer;
+  transition:all .25s;
+}
+.dot.active{background:#00d4aa;width:20px;}
+
+/* ── Download ── */
+.dl-row{display:flex;gap:10px;}
+.btn-dl{
+  background:#00d4aa;color:#0f172a;border:none;
+  padding:11px 22px;border-radius:8px;
+  font-family:inherit;font-size:13px;font-weight:700;
+  cursor:pointer;letter-spacing:.01em;transition:opacity .18s;
+}
+.btn-dl:hover{opacity:.85;}
+.btn-all{
+  background:transparent;color:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.14);
+  padding:11px 22px;border-radius:8px;
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;
+  transition:all .18s;
+}
+.btn-all:hover{background:rgba(255,255,255,.07);color:#fff;}
+.dl-status{font-size:12px;color:#00d4aa;min-height:18px;font-weight:600;}
+.btn-pdf{
+  background:transparent;color:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.14);
+  padding:11px 22px;border-radius:8px;
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;
+  transition:all .18s;
+}
+.btn-pdf:hover{background:rgba(255,255,255,.07);color:#fff;}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ══ LEFT PANEL ══ -->
+  <div class="left-panel">
+    <span class="app-label">Threads Carousel · AI Generator</span>
+    <div class="left-card">
+      <label class="input-label" for="topicInput">Topic / Prompt</label>
+      <textarea id="topicInput" placeholder="Contoh: Cash flow visibility untuk startup B2B...&#10;&#10;Deskripsikan topik, audiens, atau pesan utama yang ingin kamu sampaikan."></textarea>
+      <button id="genBtn" onclick="generate()">✦ Generate Slides</button>
+      <div id="genStatus" class="gen-status"></div>
+    </div>
+    <div class="left-card caption-card" id="captionCard">
+      <div class="cap-head">
+        <span class="input-label">Caption</span>
+        <span class="cap-count" id="capCount">0 / 300</span>
+      </div>
+      <div id="captionText" class="caption-output"></div>
+      <button class="btn-copy" id="copyBtn" onclick="copyCaption()">Copy Caption</button>
+    </div>
+  </div>
+
+  <!-- ══ RIGHT PANEL ══ -->
+  <div class="right-panel">
+    <div class="viewer" id="viewer">
+      <!-- slides rendered by JS -->
+    </div>
+    <div class="controls">
+      <button class="nav-arrow" id="prev" onclick="nav(-1)" disabled>←</button>
+      <div class="dots" id="dotbox"></div>
+      <button class="nav-arrow" id="next" onclick="nav(1)">→</button>
+    </div>
+    <div class="dl-row">
+      <button class="btn-dl" onclick="dlCurrent()">⬇ Download Slide Ini</button>
+      <button class="btn-all" onclick="dlAll()">Download Semua PNG</button>
+      <button class="btn-pdf" onclick="dlPdf()">Download PDF</button>
+    </div>
+    <div class="dl-status" id="status"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+
+/* ─────────────────────────────
+   KEYS & CONFIG
+───────────────────────────── */
+const GEMINI_KEY   = 'AIzaSyAVqDPQDbhehcqocAD2cL93NhI2EPoIkFQ';
+const TAVILY_KEY   = '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';
+const GEMINI_MODEL = 'gemini-3-flash-preview';
+
+/* ─────────────────────────────
+   DEFAULT SLIDES (MontPro)
+───────────────────────────── */
+const DEFAULT_SLIDES = [
+  {
+    type: 'hook',
+    pre: 'Cara tidur nyenyak tiap weekend:',
+    headline: 'Tahu kondisi cash<br><em>13 minggu</em><br>ke depan.',
+    sub: 'Cash Flow Visibility',
+    decoStyle: 'orb'
+  },
+  {
+    type: 'compare',
+    leftLabel: 'Saldo Bank', leftValue: 'Rp 847 jt',
+    leftBadge: 'Statis — Hari ini saja', leftTrend: 'flat',
+    rightLabel: 'Cash Flow Forecast', rightValue: 'Rp 1,24 M',
+    rightBadge: '● 13 Minggu Ke Depan', rightTrend: 'rising',
+    copy: 'Kebanyakan founder cuma tahu sisa uang di bank hari ini. Tapi kalian tidak tahu apakah uang itu cukup untuk bayar operasional 2 bulan lagi.'
+  },
+  {
+    type: 'chart',
+    title: '13-Week Rolling Cash Forecast', syncLabel: 'Auto-sync aktif',
+    barData: [
+      {pct:54,pos:true},{pct:72,pos:true},{pct:46,pos:true},{pct:28,pos:false},
+      {pct:64,pos:true},{pct:82,pos:true},{pct:59,pos:true},{pct:22,pos:false},
+      {pct:68,pos:true},{pct:88,pos:true},{pct:56,pos:true},{pct:18,pos:false},
+      {pct:94,pos:true}
+    ],
+    stat1Label: 'Estimasi Kas Akhir', stat1Value: 'Rp 2,1 M',
+    stat2Label: 'Minggu Kritis',       stat2Value: 'W4, W8, W12',
+    stat3Label: 'Terakhir Diperbarui', stat3Value: 'Baru saja',
+    copy: 'Di MontPro, laporan cash flow kalian terupdate otomatis. Tidak perlu tarik data manual dari Excel setiap akhir bulan.'
+  },
+  {
+    type: 'whatif',
+    intro: 'What-If Simulator',
+    cardATag: 'Skenario A',
+    cardAQ: 'Bagaimana kalau pembayaran klien delay 30 hari?',
+    cardAResultLabel: 'Dampak Kas', cardAResultValue: '−Rp 340 jt di W6',
+    cardBTag: 'Skenario B',
+    cardBQ: 'Bagaimana kalau kita hire tim sales baru bulan depan?',
+    cardBResultLabel: 'ROI Proyeksi', cardBResultValue: '+Rp 890 jt di W13',
+    copy: 'Kalian bisa simulasi skenario: "Bagaimana kalau pembayaran klien delay?" atau "Bagaimana kalau kita hire tim sales baru bulan depan?".'
+  },
+  {
+    type: 'cta',
+    copy: 'Visibility jernih,<br>keputusan jadi<br><em>lebih berani.</em>',
+    cta: 'Coba Gratis 14 Hari →',
+    note: 'Cek link di bio'
+  }
+];
+
+const DEFAULT_BAR_DATA = DEFAULT_SLIDES[2].barData;
+
+/* ─────────────────────────────
+   ACCENT PALETTE (bluish-aligned)
+   Bluish navy stays the core background; accent is the
+   single highlight color used across one deck for cohesion.
+───────────────────────────── */
+const ACCENTS = {
+  teal:   { hex:'#00d4aa', rgb:'0,212,170' },
+  sky:    { hex:'#38bdf8', rgb:'56,189,248' },
+  azure:  { hex:'#3b82f6', rgb:'59,130,246' },
+  indigo: { hex:'#6366f1', rgb:'99,102,241' },
+  violet: { hex:'#8b5cf6', rgb:'139,92,246' },
+  cyan:   { hex:'#22d3ee', rgb:'34,211,238' }
+};
+let DECK_ACCENT = ACCENTS.teal;
+
+/* ─────────────────────────────
+   STATE
+───────────────────────────── */
+let TOTAL = 0;
+let cur   = 0;
+
+/* ─────────────────────────────
+   SLIDE BUILDERS
+───────────────────────────── */
+const HOOK_DECOS = {
+  orb: `<svg class="s1-deco" width="300" height="300" viewBox="0 0 300 300" fill="none">
+    <circle cx="210" cy="90"  r="125"  fill="white"/>
+    <circle cx="170" cy="65"  r="114"  fill="#193a6d"/>
+    <circle cx="55"  cy="40"  r="3.5"  fill="white"/>
+    <circle cx="28"  cy="100" r="2"    fill="white"/>
+    <circle cx="90"  cy="158" r="2.5"  fill="white"/>
+    <circle cx="18"  cy="180" r="1.5"  fill="white"/>
+    <circle cx="112" cy="210" r="2"    fill="white"/>
+    <circle cx="42"  cy="240" r="1.5"  fill="white"/>
+    <circle cx="145" cy="258" r="1.2"  fill="white"/>
+    <circle cx="68"  cy="280" r="1.8"  fill="white"/>
+    <circle cx="14"  cy="140" r="1.2"  fill="white"/>
+    <circle cx="98"  cy="272" r="1"    fill="white"/>
+  </svg>`,
+  mesh: `<svg class="s1-deco" width="300" height="300" viewBox="0 0 300 300" fill="none">
+    <polygon points="210,30 270,90 270,180 210,240 150,180 150,90" stroke="white" stroke-width="1" fill="none" opacity=".7"/>
+    <polygon points="210,60 250,100 250,170 210,210 170,170 170,100" stroke="white" stroke-width=".6" fill="none" opacity=".5"/>
+    <polygon points="210,90 235,115 235,155 210,180 185,155 185,115" stroke="white" stroke-width=".4" fill="none" opacity=".4"/>
+    <circle cx="55"  cy="40"  r="3" fill="white" opacity=".4"/>
+    <circle cx="28"  cy="100" r="2" fill="white" opacity=".3"/>
+    <circle cx="90"  cy="200" r="2.5" fill="white" opacity=".3"/>
+    <circle cx="18"  cy="180" r="1.5" fill="white" opacity=".25"/>
+    <circle cx="40"  cy="250" r="1.5" fill="white" opacity=".2"/>
+  </svg>`,
+  rays: `<svg class="s1-deco" width="300" height="300" viewBox="0 0 300 300" fill="none" opacity=".15">
+    <line x1="280" y1="20"  x2="80"  y2="280" stroke="white" stroke-width="1"/>
+    <line x1="280" y1="20"  x2="20"  y2="220" stroke="white" stroke-width=".7"/>
+    <line x1="280" y1="20"  x2="140" y2="290" stroke="white" stroke-width=".7"/>
+    <line x1="280" y1="20"  x2="200" y2="290" stroke="white" stroke-width=".5"/>
+    <line x1="280" y1="20"  x2="30"  y2="140" stroke="white" stroke-width=".5"/>
+    <circle cx="280" cy="20" r="6" fill="white"/>
+    <circle cx="280" cy="20" r="14" stroke="white" stroke-width=".5" fill="none"/>
+    <circle cx="280" cy="20" r="24" stroke="white" stroke-width=".3" fill="none"/>
+  </svg>`,
+  none: ''
+};
+
+function buildHook(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  const deco = HOOK_DECOS[d.decoStyle] !== undefined ? HOOK_DECOS[d.decoStyle] : HOOK_DECOS.none;
+  s.innerHTML = `
+    <div class="s1-grid"></div>
+    ${deco}
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="s1-body">
+      <div class="s1-pre">${d.pre}</div>
+      <div class="s1-hl">${d.headline}</div>
+      <div class="s1-rule"></div>
+      <div class="s1-sub">${d.sub}</div>
+    </div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+/* ── Compare SVG helpers ── */
+function trendColor(trend) {
+  if (trend === 'rising' || trend === 'spike') return DECK_ACCENT.hex;
+  if (trend === 'declining') return 'rgba(239,68,68,.85)';
+  if (trend === 'volatile')  return 'rgba(251,191,36,.9)';
+  return 'rgba(255,255,255,.42)';
+}
+
+function trendBadgeClass(trend) {
+  if (trend === 'rising' || trend === 'spike') return 'live';
+  if (trend === 'declining') return 'danger';
+  if (trend === 'volatile')  return 'warn';
+  return 'static';
+}
+
+function trendSvg(trend, gid, color) {
+  switch (trend) {
+    case 'rising':
+      return `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="M0,76 C25,68 48,44 75,38 C102,32 120,52 148,34 C170,18 190,10 210,6"
+            fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M0,76 C25,68 48,44 75,38 C102,32 120,52 148,34 C170,18 190,10 210,6 L210,96 L0,96Z"
+            fill="url(#${gid})"/>
+      <circle cx="75"  cy="38" r="3.5" fill="${color}"/>
+      <circle cx="148" cy="34" r="3.5" fill="${color}"/>
+      <circle cx="210" cy="6"  r="3.5" fill="${color}"/>`;
+    case 'declining':
+      return `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="M0,10 C30,16 55,30 85,44 C115,56 145,64 175,76 C192,82 202,86 210,88"
+            fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M0,10 C30,16 55,30 85,44 C115,56 145,64 175,76 C192,82 202,86 210,88 L210,96 L0,96Z"
+            fill="url(#${gid})"/>
+      <circle cx="85"  cy="44" r="3.5" fill="${color}"/>
+      <circle cx="175" cy="76" r="3.5" fill="${color}"/>
+      <circle cx="210" cy="88" r="3.5" fill="${color}"/>`;
+    case 'volatile':
+      return `<path d="M0,52 L38,18 L76,76 L114,22 L152,68 L190,28 L210,44"
+            fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="38"  cy="18" r="3.5" fill="${color}"/>
+      <circle cx="114" cy="22" r="3.5" fill="${color}"/>
+      <circle cx="190" cy="28" r="3.5" fill="${color}"/>`;
+    case 'spike':
+      return `<path d="M0,62 L55,60 L90,10 L125,60 L210,58"
+            fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="55"  cy="60" r="3"   fill="${color}"/>
+      <circle cx="90"  cy="10" r="3.5" fill="${color}"/>
+      <circle cx="125" cy="60" r="3"   fill="${color}"/>`;
+    case 'flat': default:
+      return `<line x1="0" y1="48" x2="210" y2="48" stroke="rgba(255,255,255,0.16)" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <circle cx="0"   cy="48" r="4" fill="rgba(255,255,255,0.18)"/>
+      <circle cx="70"  cy="48" r="4" fill="rgba(255,255,255,0.18)"/>
+      <circle cx="140" cy="48" r="4" fill="rgba(255,255,255,0.18)"/>
+      <circle cx="210" cy="48" r="4" fill="rgba(255,255,255,0.18)"/>`;
+  }
+}
+
+function buildCompare(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  const lt = d.leftTrend  || 'flat';
+  const rt = d.rightTrend || 'rising';
+  const lc = trendColor(lt);
+  const rc = trendColor(rt);
+  s.innerHTML = `
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="s2-compare">
+      <div class="s2-panel">
+        <div class="s2-lbl">${d.leftLabel}</div>
+        <div class="s2-num" style="color:${lc}">${d.leftValue}</div>
+        <svg width="100%" height="96" viewBox="0 0 210 96" preserveAspectRatio="none">
+          ${trendSvg(lt, 'gl'+idx, lc)}
+        </svg>
+        <div class="s2-badge ${trendBadgeClass(lt)}">${d.leftBadge}</div>
+      </div>
+      <div class="s2-panel">
+        <div class="s2-lbl">${d.rightLabel}</div>
+        <div class="s2-num" style="color:${rc}">${d.rightValue}</div>
+        <svg width="100%" height="96" viewBox="0 0 210 96" preserveAspectRatio="none">
+          ${trendSvg(rt, 'gr'+idx, rc)}
+        </svg>
+        <div class="s2-badge ${trendBadgeClass(rt)}">${d.rightBadge}</div>
+      </div>
+    </div>
+    <div class="s2-copy">${d.copy}</div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildChart(d, idx, total) {
+  const bd = (d.barData && d.barData.length === 13) ? d.barData : DEFAULT_BAR_DATA;
+  const barsHtml = bd.map((b, i) =>
+    `<div class="s3-col">
+       <div class="s3-bar ${b.pos ? 'pos' : 'neg'}" style="height:${b.pct}%"></div>
+       <div class="s3-wk">W${i+1}</div>
+     </div>`
+  ).join('');
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  s.innerHTML = `
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="s3-hdr">
+      <span class="s3-title">${d.title}</span>
+      <span class="s3-sync"><span class="s3-dot"></span>${d.syncLabel}</span>
+    </div>
+    <div class="s3-widget">
+      <div class="s3-bars">${barsHtml}</div>
+      <div class="s3-summary">
+        <div class="s3-stat">
+          <div class="s3-stat-lbl">${d.stat1Label}</div>
+          <div class="s3-stat-val" style="color:var(--accent)">${d.stat1Value}</div>
+        </div>
+        <div class="s3-stat">
+          <div class="s3-stat-lbl">${d.stat2Label}</div>
+          <div class="s3-stat-val" style="color:rgba(239,68,68,.85)">${d.stat2Value}</div>
+        </div>
+        <div class="s3-stat">
+          <div class="s3-stat-lbl">${d.stat3Label}</div>
+          <div class="s3-stat-val" style="color:rgba(255,255,255,.45)">${d.stat3Value}</div>
+        </div>
+      </div>
+    </div>
+    <div class="s3-copy">${d.copy}</div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildWhatif(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  s.innerHTML = `
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="s4-intro">${d.intro}</div>
+    <div class="s4-cards">
+      <div class="s4-card hi">
+        <div class="s4-ico red-bg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="rgba(239,68,68,0.85)" stroke-width="1.75"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="s4-qlbl">${d.cardATag}</div>
+        <div class="s4-q">${d.cardAQ}</div>
+        <div class="s4-spacer"></div>
+        <div class="s4-result red">
+          <div class="s4-rlbl red">${d.cardAResultLabel}</div>
+          <div class="s4-rval red">${d.cardAResultValue}</div>
+        </div>
+      </div>
+      <div class="s4-card">
+        <div class="s4-ico teal-bg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="${DECK_ACCENT.hex}" stroke-width="1.75"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="s4-qlbl">${d.cardBTag}</div>
+        <div class="s4-q">${d.cardBQ}</div>
+        <div class="s4-spacer"></div>
+        <div class="s4-result tl">
+          <div class="s4-rlbl tl">${d.cardBResultLabel}</div>
+          <div class="s4-rval tl">${d.cardBResultValue}</div>
+        </div>
+      </div>
+    </div>
+    <div class="s4-copy">${d.copy}</div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildBody(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  s.innerHTML = `
+    <div class="s1-grid"></div>
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="sbody-body">
+      <div class="sbody-hl">${d.headline}</div>
+      <div class="sbody-copy">${d.copy}</div>
+    </div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildCta(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide s5' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  s.innerHTML = `
+    <div class="s5-sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <svg class="s5-rings" width="420" height="420" viewBox="0 0 420 420">
+      <circle cx="210" cy="210" r="200" stroke="white" stroke-width="1"   fill="none"/>
+      <circle cx="210" cy="210" r="155" stroke="white" stroke-width=".6"  fill="none"/>
+      <circle cx="210" cy="210" r="110" stroke="white" stroke-width=".35" fill="none"/>
+    </svg>
+    <div class="s5-content">
+      <div class="s5-rule"></div>
+      <div class="s5-copy">${d.copy}</div>
+      <div class="s5-cta">${d.cta}</div>
+      <div class="s5-note">${d.note}</div>
+    </div>
+    <div class="logo-center">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildStat(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  const trend = (d.deltaTrend === 'down' || d.deltaTrend === 'flat') ? d.deltaTrend : 'up';
+  const delta = d.delta
+    ? `<span class="sstat-delta ${trend}">${d.delta}</span>` : '';
+  s.innerHTML = `
+    <div class="s1-grid"></div>
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="sstat-body">
+      ${d.intro ? `<div class="sstat-intro">${d.intro}</div>` : ''}
+      <div class="sstat-num">${d.value}${delta}</div>
+      ${d.label ? `<div class="sstat-label">${d.label}</div>` : ''}
+      ${d.copy ? `<div class="sstat-copy">${d.copy}</div>` : ''}
+    </div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildList(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  const items = (d.items || []).slice(0, 4);
+  const rows = items.map((it, i) => `
+    <div class="slist-row">
+      <div class="slist-badge">${i+1}</div>
+      <div class="slist-txt">
+        <div class="slist-lbl">${it.label || ''}</div>
+        ${it.desc ? `<div class="slist-desc">${it.desc}</div>` : ''}
+      </div>
+    </div>`).join('');
+  s.innerHTML = `
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    ${d.title ? `<div class="slist-title">${d.title}</div>` : ''}
+    <div class="slist-items">${rows}</div>
+    ${d.copy ? `<div class="slist-copy">${d.copy}</div>` : ''}
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildQuote(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  s.innerHTML = `
+    <div class="s1-grid"></div>
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="squote-body">
+      <div class="squote-mark">"</div>
+      <div class="squote-text">${d.quote || ''}</div>
+      ${d.attribution ? `<div class="squote-attr">${d.attribution}</div>` : ''}
+    </div>
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildInsight(d, idx, total) {
+  const s = document.createElement('div');
+  s.className = 'slide' + (idx === 0 ? ' active' : '');
+  s.id = 'slide-' + idx;
+  const items = (d.insights || []).slice(0, 4);
+  const rows = items.map(it => {
+    const sev = ['high','medium','low'].includes(it.severity) ? it.severity : 'low';
+    return `
+    <div class="sins-row ${sev}">
+      <div class="sins-dot"></div>
+      <div class="sins-main">
+        ${it.category ? `<div class="sins-cat">${it.category}</div>` : ''}
+        <div class="sins-title">${it.title || ''}</div>
+      </div>
+      ${it.value ? `<div class="sins-val">${it.value}</div>` : ''}
+    </div>`;
+  }).join('');
+  s.innerHTML = `
+    <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
+    <div class="sins-intro"><span class="sins-spark">✦</span>${d.intro || 'AI Insights'}</div>
+    <div class="sins-list">${rows}</div>
+    ${d.copy ? `<div class="sins-copy">${d.copy}</div>` : ''}
+    <div class="logo-br">MontPro<span style="color:var(--accent);">.</span></div>`;
+  return s;
+}
+
+function buildSlide(d, idx, total) {
+  let node;
+  switch (d.type) {
+    case 'hook':    node = buildHook(d, idx, total); break;
+    case 'compare': node = buildCompare(d, idx, total); break;
+    case 'chart':   node = buildChart(d, idx, total); break;
+    case 'whatif':  node = buildWhatif(d, idx, total); break;
+    case 'stat':    node = buildStat(d, idx, total); break;
+    case 'list':    node = buildList(d, idx, total); break;
+    case 'quote':   node = buildQuote(d, idx, total); break;
+    case 'insight': node = buildInsight(d, idx, total); break;
+    case 'body':    node = buildBody(d, idx, total); break;
+    case 'cta':     node = buildCta(d, idx, total); break;
+    default:        node = buildBody(d, idx, total); break;
+  }
+  // Apply the deck accent so it inherits into all children (and html2canvas export).
+  node.style.setProperty('--accent', DECK_ACCENT.hex);
+  node.style.setProperty('--accent-rgb', DECK_ACCENT.rgb);
+  return node;
+}
+
+/* ─────────────────────────────
+   RENDER
+───────────────────────────── */
+function renderSlides(slides, accent) {
+  DECK_ACCENT = ACCENTS[accent] || ACCENTS.teal;
+  const viewer = document.getElementById('viewer');
+  viewer.innerHTML = '';
+  TOTAL = slides.length;
+  cur   = 0;
+  slides.forEach((d, i) => viewer.appendChild(buildSlide(d, i, TOTAL)));
+  initNav();
+}
+
+/* ─────────────────────────────
+   NAV
+───────────────────────────── */
+function initNav() {
+  const db = document.getElementById('dotbox');
+  db.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.onclick = () => goTo(i);
+    db.appendChild(d);
+  }
+  document.getElementById('prev').disabled = true;
+  document.getElementById('next').disabled = TOTAL <= 1;
+}
+
+function goTo(n) {
+  const slides = document.querySelectorAll('.slide');
+  const db = document.getElementById('dotbox');
+  slides[cur].classList.remove('active');
+  db.children[cur].classList.remove('active');
+  cur = n;
+  slides[cur].classList.add('active');
+  db.children[cur].classList.add('active');
+  document.getElementById('prev').disabled = cur === 0;
+  document.getElementById('next').disabled = cur === TOTAL - 1;
+}
+
+window.nav = function(d) {
+  const n = cur + d;
+  if (n >= 0 && n < TOTAL) goTo(n);
+};
+
+/* ─────────────────────────────
+   DOWNLOAD
+───────────────────────────── */
+async function capture(idx) {
+  const slides = document.querySelectorAll('.slide');
+  const sl = slides[idx];
+  const wasOff = !sl.classList.contains('active');
+  if (wasOff) sl.style.cssText = 'opacity:1;pointer-events:auto;';
+  await document.fonts.ready;
+  const c = await html2canvas(sl, {
+    scale:2, useCORS:true, allowTaint:true,
+    backgroundColor:null, width:540, height:675, logging:false
+  });
+  if (wasOff) sl.style.cssText = '';
+  return c;
+}
+
+window.dlCurrent = async function() {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = 'Mengekspor...';
+  try {
+    const c = await capture(cur);
+    const a = document.createElement('a');
+    a.download = `slide-${cur+1}.png`;
+    a.href = c.toDataURL('image/png');
+    a.click();
+    statusEl.textContent = `✓ Slide ${cur+1} berhasil diunduh`;
+  } catch(e) {
+    statusEl.textContent = 'Gagal. Coba lagi.';
+    console.error(e);
+  }
+  setTimeout(() => statusEl.textContent = '', 3500);
+};
+
+window.dlAll = async function() {
+  const statusEl = document.getElementById('status');
+  for (let i = 0; i < TOTAL; i++) {
+    statusEl.textContent = `Mengekspor ${i+1} / ${TOTAL}...`;
+    try {
+      const c = await capture(i);
+      const a = document.createElement('a');
+      a.download = `slide-${i+1}.png`;
+      a.href = c.toDataURL('image/png');
+      a.click();
+      await new Promise(r => setTimeout(r, 700));
+    } catch(e) { console.error(`Slide ${i+1}:`, e); }
+  }
+  statusEl.textContent = '✓ Semua slide berhasil diunduh!';
+  setTimeout(() => statusEl.textContent = '', 4000);
+};
+
+window.dlPdf = async function() {
+  if (TOTAL === 0) return;
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = 'Menyiapkan PDF...';
+  try {
+    const { jsPDF } = window.jspdf;
+    const W_PX = 540, H_PX = 675;
+    // Convert px → pt (72pt per inch, 96px per inch) so PDF uses standard units
+    const W_PT = W_PX * 72 / 96;   // 405pt
+    const H_PT = H_PX * 72 / 96;   // 506.25pt
+    const pdf = new jsPDF({ unit: 'pt', format: [W_PT, H_PT], orientation: 'portrait' });
+
+    const allSlides = document.querySelectorAll('.slide');
+    await document.fonts.ready;
+
+    for (let i = 0; i < TOTAL; i++) {
+      statusEl.textContent = `Mengekspor slide ${i+1} / ${TOTAL}...`;
+      if (i > 0) pdf.addPage([W_PT, H_PT]);
+
+      const sl = allSlides[i];
+      const wasOff = !sl.classList.contains('active');
+      if (wasOff) sl.style.cssText = 'opacity:1;pointer-events:auto;';
+      // scale:6 → 3240×4050px canvas (~576 DPI) for sharp PDF output
+      const c = await html2canvas(sl, {
+        scale: 6, useCORS: true, allowTaint: true,
+        backgroundColor: null, width: W_PX, height: H_PX, logging: false
+      });
+      if (wasOff) sl.style.cssText = '';
+
+      pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, W_PT, H_PT);
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    pdf.save('slides-carousel.pdf');
+    statusEl.textContent = '✓ PDF berhasil diunduh!';
+  } catch(e) {
+    statusEl.textContent = 'Gagal membuat PDF. Coba lagi.';
+    console.error(e);
+  }
+  setTimeout(() => statusEl.textContent = '', 4000);
+};
+
+/* ─────────────────────────────
+   TAVILY SEARCH
+───────────────────────────── */
+async function searchTavily(topic) {
+  try {
+    const r = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        api_key: TAVILY_KEY,
+        query: topic,
+        max_results: 5,
+        include_answer: true,
+        search_depth: 'basic'
+      })
+    });
+    const data = await r.json();
+    const snippets = (data.results || [])
+      .map(r => r.content || r.snippet || '')
+      .filter(Boolean)
+      .slice(0, 5);
+    if (data.answer) snippets.unshift(data.answer);
+    return snippets.join('\n\n');
+  } catch(e) {
+    console.warn('Tavily search failed, continuing without context:', e);
+    return '';
+  }
+}
+
+/* ─────────────────────────────
+   GEMINI GENERATION
+───────────────────────────── */
+const SYSTEM_PROMPT = `You are the social media owner for MontPro. You don't just write copy — you steer the brand's voice and tell MontPro's story, one Threads carousel at a time. Every post should make a founder or finance lead feel understood, then show how MontPro changes their day.
+
+═══ ABOUT MONTPRO (your product — use this, stay accurate) ═══
+MontPro is "The Augmented Finance OS" — an AI-powered finance platform for Indonesian SMEs, startups, and their finance teams. It turns raw accounting data into real-time decisions. Core story beats you can draw from:
+- Real-time dashboard: a customizable command center of live KPIs (cash balance, runway, burn rate, net/gross margin, AR/AP outstanding, working capital) pulled straight from the GL — no manual Excel pulls.
+- 13-week rolling cash flow forecast: auto-synced from open AP/AR, so founders see their cash position weeks ahead, not just today's bank balance.
+- What-If simulator: model scenarios like "what if a client pays 30 days late?" or "what if we hire a sales team next month?" and see the cash impact.
+- AI Insights: real-time alerts ranked by severity (high/medium/low) across cashflow, budget, AP/AR aging, GL anomalies — surfaced on the dashboard and a notification bell.
+- Financial Health Score: an IFC SME credit score (0–5) across 5 pillars (debt service coverage, current ratio, debt-to-equity, ROA, cash flow ratio).
+- Indonesian compliance built in: PPN & PPh tax reports, fiscal worksheet (PSAK 46 deferred tax, koreksi fiskal), month-end close.
+- Budgeting, forecasting, reports & analytics, reconciliation (AP/AR ↔ GL).
+- Pricing: Basic Rp 1jt/bln, Advanced Rp 2jt/bln (the tier you push), Enterprise Rp 3jt/bln. 14-day free trial. 200 AI interactions/month included.
+- Audience pain: founders only know today's bank balance, drown in spreadsheets, react late, can't answer "do we have enough runway?"
+
+═══ OUTPUT ═══
+Output ONLY a raw JSON object — no markdown, no code fences, no explanation.
+Return: {"accent": "...", "caption": "...", "slides": [...]}
+
+═══ STORY FLOW (non-negotiable) ═══
+- 4 to 8 slides total. Choose count based on how much story the topic needs.
+- First slide type MUST be "hook". Last slide type MUST be "cta".
+- The MIDDLE is yours to design. Compose 2–6 middle slides from any mix of the types below to build a compelling arc: tension (the problem) → turn (how MontPro works) → proof (numbers/insights) → payoff. Don't just stack the same type — vary them like a good carousel.
+
+═══ ACCENT COLOR ═══
+The background is always deep bluish navy (the brand core). Pick ONE accent for the whole deck — used consistently across every slide for cohesion. Set top-level "accent" to one of:
+  "teal" (default MontPro brand), "sky", "azure", "indigo", "violet", "cyan".
+All are bluish-aligned. Use "teal" unless the topic's mood calls for another (e.g. "violet"/"indigo" for premium/strategic/AI topics, "sky"/"azure" for trust/clarity/cash topics, "cyan" for fresh/tech). Never use an off-palette color. Semantic red/amber for risk/decline is automatic — don't fight it.
+
+═══ STYLE ═══
+- Language: Bahasa Indonesia unless the topic/research is clearly in English. Brand voice: warm, confident, plainspoken peer — speak as "kami/MontPro" to "kamu/kalian" (founders). Never corporate-stiff.
+- Keep "copy" fields 1–3 sentences. Make every number specific and realistic for an Indonesian SME (use Rp).
+- In headline/quote fields that support it, wrap ONE key phrase in <em> tags for accent emphasis.
+
+═══ SLIDE TYPES & SCHEMAS (use these exact keys) ═══
+hook:    {type, pre, headline, sub, decoStyle}
+  decoStyle: "orb" (cash flow/finance/cycles), "mesh" (tech/SaaS/data/networks), "rays" (insights/clarity/monitoring/scores), "none" (safe default). Never "orb" for non-finance.
+compare: {type, leftLabel, leftValue, leftBadge, leftTrend, rightLabel, rightValue, rightBadge, rightTrend, copy}
+  trends: "flat","rising","declining","volatile","spike" — shapes+colors auto-render; pick trends that reinforce the contrast (e.g. left "flat" static bank balance vs right "rising" forecast).
+chart:   {type, title, syncLabel, barData, stat1Label, stat1Value, stat2Label, stat2Value, stat3Label, stat3Value, copy}
+  barData: EXACTLY 13 objects [{pct: int 10-95, pos: bool}]. Pattern reflects the real narrative (mostly neg = problem weeks, mostly pos = healthy).
+whatif:  {type, intro, cardATag, cardAQ, cardAResultLabel, cardAResultValue, cardBTag, cardBQ, cardBResultLabel, cardBResultValue, copy}
+  Card A renders as the risk scenario (red), Card B as the upside (accent). Great for the What-If simulator story.
+stat:    {type, intro, value, label, delta, deltaTrend, copy}
+  ONE hero number (value, e.g. "13 minggu" or "Rp 2,1 M"). delta optional short tag (e.g. "+38%"); deltaTrend: "up"|"down"|"flat".
+list:    {type, title, items, copy}
+  items: 2–4 objects [{label, desc}]. Use for "3 hal yang MontPro otomatiskan" / feature or step breakdowns. title supports <em>.
+quote:   {type, quote, attribution}
+  A bold statement or founder testimonial. quote supports <em>. attribution e.g. "Founder, startup B2B SaaS".
+insight: {type, intro, insights, copy}
+  Mirrors MontPro's real AI Insights feature. insights: 2–4 objects [{severity: "high"|"medium"|"low", category, title, value}]. category short (e.g. "Cashflow","AP/AR","Budget"). Powerful proof slide.
+body:    {type, headline, copy}
+  Plain statement slide. headline supports <em>.
+cta:     {type, copy, cta, note}
+  copy supports <em> and <br>. cta = button text (e.g. "Coba Gratis 14 Hari →"). note e.g. "Cek link di bio".
+
+Note: hook.headline and cta.copy may use <br> for line breaks.
+
+═══ CAPTION (hard limit) ═══
+Top-level "caption": a Threads caption in the slides' language, written in MontPro's voice.
+- MAXIMUM 300 characters TOTAL, including spaces and hashtags. This is a hard cap — count and stay under it.
+- Structure with blank lines (\\n\\n): one punchy hook line, one short value line, one CTA line, then 1–3 tight hashtags on the last line.
+- Be concise — every character counts toward the 300 limit. Prefer 2 great hashtags over 5 weak ones.`;
+
+async function generateWithGemini(topic, context) {
+  const userMsg = context
+    ? `Topic: ${topic}\n\nResearch context:\n${context}`
+    : `Topic: ${topic}`;
+
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
+    {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        system_instruction: {parts: [{text: SYSTEM_PROMPT}]},
+        contents: [{role: 'user', parts: [{text: userMsg}]}],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.9
+        }
+      })
+    }
+  );
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || `Gemini error ${r.status}`);
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Empty response from Gemini');
+  return JSON.parse(text);
+}
+
+/* ─────────────────────────────
+   CAPTION
+───────────────────────────── */
+function displayCaption(text) {
+  const container = document.getElementById('captionText');
+  const paras = text.split(/\n\n+/).filter(p => p.trim());
+  container.innerHTML = paras.map(p => {
+    const trimmed = p.trim();
+    const isHashtags = /^#\w|#\w{2,}/.test(trimmed);
+    return `<p class="${isHashtags ? 'c-tags' : ''}">${trimmed.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+  const len = text.trim().length;
+  const counter = document.getElementById('capCount');
+  counter.textContent = `${len} / 300`;
+  counter.classList.toggle('over', len > 300);
+  document.getElementById('captionCard').style.display = 'flex';
+  document.getElementById('copyBtn').textContent = 'Copy Caption';
+  document.getElementById('copyBtn').classList.remove('copied');
+}
+
+window.copyCaption = function() {
+  const text = Array.from(document.getElementById('captionText').querySelectorAll('p'))
+    .map(p => p.innerText).join('\n\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy Caption';
+      btn.classList.remove('copied');
+    }, 2500);
+  });
+};
+
+/* ─────────────────────────────
+   GENERATE HANDLER
+───────────────────────────── */
+window.generate = async function() {
+  const topic = document.getElementById('topicInput').value.trim();
+  if (!topic) return;
+
+  const btn    = document.getElementById('genBtn');
+  const status = document.getElementById('genStatus');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    status.textContent = '🔍 Researching topic...';
+    const context = await searchTavily(topic);
+
+    status.textContent = '✍️ Writing slides...';
+    const result = await generateWithGemini(topic, context);
+
+    if (!result.slides || !Array.isArray(result.slides) || result.slides.length < 2) {
+      throw new Error('Invalid response structure from Gemini');
+    }
+
+    renderSlides(result.slides, result.accent);
+    if (result.caption) displayCaption(result.caption);
+    status.textContent = `✓ ${result.slides.length} slides generated`;
+    setTimeout(() => status.textContent = '', 4000);
+  } catch(e) {
+    status.textContent = '⚠ ' + (e.message || 'Generation failed. Try again.');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✦ Generate Slides';
+  }
+};
+
+/* ─────────────────────────────
+   PLACEHOLDER
+───────────────────────────── */
+function renderPlaceholder() {
+  const viewer = document.getElementById('viewer');
+  viewer.innerHTML = `
+    <div class="slide active placeholder-slide">
+      <div class="s1-grid"></div>
+      <div class="ph-wrap">
+        <div class="ph-icon">✦</div>
+        <div class="ph-title">Belum ada slides</div>
+        <div class="ph-hint">Masukkan topik di panel kiri<br>lalu klik Generate Slides</div>
+      </div>
+    </div>`;
+  TOTAL = 0;
+  cur   = 0;
+  document.getElementById('dotbox').innerHTML = '';
+  document.getElementById('prev').disabled = true;
+  document.getElementById('next').disabled = true;
+}
+
+/* ─────────────────────────────
+   AGENT RENDER MODE
+   Loads slide JSON from the URL hash so the social agent can
+   deep-link a pre-rendered carousel: ...carousel.html#data=<base64url>
+   Payload: { slides:[...], accent:"teal", caption:"..." }
+   Add &auto=1 to auto-export all PNGs (for a future headless runner).
+───────────────────────────── */
+function showAgentBanner(n) {
+  const b = document.createElement('div');
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99;background:#00d4aa;color:#06121f;font-family:Geist,sans-serif;font-size:13px;font-weight:700;letter-spacing:.01em;padding:11px 16px;text-align:center;';
+  b.textContent = n + ' slide dimuat dari agent — klik "Download Semua PNG" di bawah viewer untuk mengekspor.';
+  document.body.appendChild(b);
+  document.body.style.paddingTop = '42px';
+}
+
+function loadFromAgent() {
+  try {
+    const h = window.location.hash || '';
+    const m = h.match(/[#&]data=([^&]+)/);
+    if (!m) return false;
+    let b64 = decodeURIComponent(m[1]).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    const slides = Array.isArray(payload) ? payload : payload.slides;
+    if (!Array.isArray(slides) || !slides.length) return false;
+    renderSlides(slides, payload.accent);
+    if (payload.caption) displayCaption(payload.caption);
+    showAgentBanner(slides.length);
+    if (/[#&]auto=1/.test(h)) {
+      document.fonts.ready.then(() => setTimeout(() => window.dlAll && window.dlAll(), 700));
+    }
+    return true;
+  } catch (e) {
+    console.error('Agent payload load failed:', e);
+    return false;
+  }
+}
+
+/* ─────────────────────────────
+   INIT
+───────────────────────────── */
+if (!loadFromAgent()) renderPlaceholder();
+
+})();
+</script>
+</body>
+</html>
