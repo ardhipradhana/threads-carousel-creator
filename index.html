@@ -821,44 +821,63 @@ function buildWhatif(d, idx, total) {
   const s = document.createElement('div');
   s.className = 'slide' + (idx === 0 ? ' active' : '');
   s.id = 'slide-' + idx;
+
+  function cardColorClass(color) {
+    if (color === 'green') return 'tl';
+    if (color === 'red')   return 'red';
+    return 'tl'; // teal default
+  }
+  function icoClass(color) {
+    if (color === 'red')   return 'red-bg';
+    return 'teal-bg';
+  }
+  function icoStroke(color) {
+    if (color === 'red')   return 'rgba(239,68,68,0.85)';
+    return DECK_ACCENT.hex;
+  }
+  function icoSvg(color) {
+    if (color === 'red') return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+         stroke="${icoStroke(color)}" stroke-width="1.75"
+         stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>`;
+    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+         stroke="${icoStroke(color)}" stroke-width="1.75"
+         stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>`;
+  }
+
+  const aColor = d.cardAColor || 'red';
+  const bColor = d.cardBColor || 'teal';
+  const aCC    = cardColorClass(aColor);
+  const bCC    = cardColorClass(bColor);
+
   s.innerHTML = `
     <div class="sh"><span class="snum">${idx+1} / ${total}</span></div>
     <div class="s4-intro">${d.intro}</div>
     <div class="s4-cards">
-      <div class="s4-card hi">
-        <div class="s4-ico red-bg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-               stroke="rgba(239,68,68,0.85)" stroke-width="1.75"
-               stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-        </div>
+      <div class="s4-card ${aColor === 'green' ? 'hi' : ''}">
+        <div class="s4-ico ${icoClass(aColor)}">${icoSvg(aColor)}</div>
         <div class="s4-qlbl">${d.cardATag}</div>
         <div class="s4-q">${d.cardAQ}</div>
         <div class="s4-spacer"></div>
-        <div class="s4-result red">
-          <div class="s4-rlbl red">${d.cardAResultLabel}</div>
-          <div class="s4-rval red">${d.cardAResultValue}</div>
+        <div class="s4-result ${aCC}">
+          <div class="s4-rlbl ${aCC}">${d.cardAResultLabel}</div>
+          <div class="s4-rval ${aCC}">${d.cardAResultValue}</div>
         </div>
       </div>
-      <div class="s4-card">
-        <div class="s4-ico teal-bg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-               stroke="${DECK_ACCENT.hex}" stroke-width="1.75"
-               stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-        </div>
+      <div class="s4-card ${bColor === 'green' ? 'hi' : ''}">
+        <div class="s4-ico ${icoClass(bColor)}">${icoSvg(bColor)}</div>
         <div class="s4-qlbl">${d.cardBTag}</div>
         <div class="s4-q">${d.cardBQ}</div>
         <div class="s4-spacer"></div>
-        <div class="s4-result tl">
-          <div class="s4-rlbl tl">${d.cardBResultLabel}</div>
-          <div class="s4-rval tl">${d.cardBResultValue}</div>
+        <div class="s4-result ${bCC}">
+          <div class="s4-rlbl ${bCC}">${d.cardBResultLabel}</div>
+          <div class="s4-rval ${bCC}">${d.cardBResultValue}</div>
         </div>
       </div>
     </div>
